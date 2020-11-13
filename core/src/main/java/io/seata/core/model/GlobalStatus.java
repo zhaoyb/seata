@@ -19,6 +19,9 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
+ *
+ * 全局事务状态
+ *
  * Status of global transaction.
  *
  * @author sharajava
@@ -26,6 +29,7 @@ import java.util.Map;
 public enum GlobalStatus {
 
     /**
+     * 未知状态
      * Un known global status.
      */
     // Unknown
@@ -56,12 +60,16 @@ public enum GlobalStatus {
     Rollbacking(4),
 
     /**
+     * 回滚重试中
+     *
      * The Rollback retrying.
      */
     // Retrying rollback after a recoverable failure.
     RollbackRetrying(5),
 
     /**
+     * 回滚超时
+     *
      * The Timeout rollbacking.
      */
     // Rollbacking since timeout
@@ -116,7 +124,11 @@ public enum GlobalStatus {
     TimeoutRollbackFailed(14),
 
     /**
+     * 结束
+     *
      * The Finished.
+     *
+     *
      */
     // Not managed in session MAP any more
     Finished(15);

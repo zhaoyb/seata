@@ -48,6 +48,14 @@ public abstract class AbstractTableMetaCache implements TableMetaCache {
             .expireAfterWrite(EXPIRE_TIME, TimeUnit.MILLISECONDS).softValues().build();
 
 
+    /**
+     * 获取表结构
+     *
+     * @param connection
+     * @param tableName       the table name
+     * @param resourceId
+     * @return
+     */
     @Override
     public TableMeta getTableMeta(final Connection connection, final String tableName, String resourceId) {
         if (StringUtils.isNullOrEmpty(tableName)) {

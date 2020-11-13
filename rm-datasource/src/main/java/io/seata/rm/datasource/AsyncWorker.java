@@ -60,6 +60,10 @@ public class AsyncWorker implements ResourceManagerInbound {
     private static final int UNDOLOG_DELETE_LIMIT_SIZE = 1000;
 
 
+    /**
+     * 二阶段
+     *
+     */
     private static class Phase2Context {
 
         /**
@@ -109,9 +113,22 @@ public class AsyncWorker implements ResourceManagerInbound {
     private static final BlockingQueue<Phase2Context> ASYNC_COMMIT_BUFFER = new LinkedBlockingQueue<>(
         ASYNC_COMMIT_BUFFER_LIMIT);
 
+    /**
+     *
+     * 二阶段提交
+     *
+     * @param branchType      the branch type
+     * @param xid             Transaction id.
+     * @param branchId        Branch id.
+     * @param resourceId      Resource id.
+     * @param applicationData Application data bind with this branch.
+     * @return
+     * @throws TransactionException
+     */
     @Override
     public BranchStatus branchCommit(BranchType branchType, String xid, long branchId, String resourceId,
                                      String applicationData) throws TransactionException {
+        //将Phase2Context插入到内存队列，异步执行
         if (!ASYNC_COMMIT_BUFFER.offer(new Phase2Context(branchType, xid, branchId, resourceId, applicationData))) {
             LOGGER.warn("Async commit buffer is FULL. Rejected branch [{}/{}] will be handled by housekeeping later.", branchId, xid);
         }
@@ -124,6 +141,7 @@ public class AsyncWorker implements ResourceManagerInbound {
     public synchronized void init() {
         LOGGER.info("Async Commit Buffer Limit: {}", ASYNC_COMMIT_BUFFER_LIMIT);
         ScheduledExecutorService timerExecutor = new ScheduledThreadPoolExecutor(1, new NamedThreadFactory("AsyncWorker", 1, true));
+        // 定时读取二阶段提交队列， 执行提交
         timerExecutor.scheduleAtFixedRate(() -> {
             try {
 
@@ -142,9 +160,13 @@ public class AsyncWorker implements ResourceManagerInbound {
         }
 
         Map<String, List<Phase2Context>> mappedContexts = new HashMap<>(DEFAULT_RESOURCE_SIZE);
+        // 一次性把内存队列全部读出来
         while (!ASYNC_COMMIT_BUFFER.isEmpty()) {
+            // 分支提交信息
             Phase2Context commitContext = ASYNC_COMMIT_BUFFER.poll();
+            // 以分支resourceId为key
             List<Phase2Context> contextsGroupedByResourceId = mappedContexts.computeIfAbsent(commitContext.resourceId, k -> new ArrayList<>());
+            //存放在map中
             contextsGroupedByResourceId.add(commitContext);
         }
 
@@ -167,12 +189,15 @@ public class AsyncWorker implements ResourceManagerInbound {
                 List<Phase2Context> contextsGroupedByResourceId = entry.getValue();
                 Set<String> xids = new LinkedHashSet<>(UNDOLOG_DELETE_LIMIT_SIZE);
                 Set<Long> branchIds = new LinkedHashSet<>(UNDOLOG_DELETE_LIMIT_SIZE);
+
+                // 批量删除
                 for (Phase2Context commitContext : contextsGroupedByResourceId) {
                     xids.add(commitContext.xid);
                     branchIds.add(commitContext.branchId);
                     int maxSize = Math.max(xids.size(), branchIds.size());
                     if (maxSize == UNDOLOG_DELETE_LIMIT_SIZE) {
                         try {
+                            // 分批删除
                             UndoLogManagerFactory.getUndoLogManager(dataSourceProxy.getDbType()).batchDeleteUndoLog(
                                 xids, branchIds, conn);
                         } catch (Exception ex) {
@@ -187,6 +212,7 @@ public class AsyncWorker implements ResourceManagerInbound {
                     return;
                 }
 
+                // 最后一个批次，可能不够UNDOLOG_DELETE_LIMIT_SIZE，没有触发上面的删除， 这里再单独删一次
                 try {
                     UndoLogManagerFactory.getUndoLogManager(dataSourceProxy.getDbType()).batchDeleteUndoLog(xids,
                         branchIds, conn);

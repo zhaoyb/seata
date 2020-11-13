@@ -23,12 +23,16 @@ package io.seata.tm.api;
 public enum GlobalTransactionRole {
 
     /**
+     * 全局事务开启者
+     *
      * The Launcher.
      */
     // The one begins the current global transaction.
     Launcher,
 
     /**
+     * 全局事务参与者
+     *
      * The Participant.
      */
     // The one just joins into a existing global transaction.

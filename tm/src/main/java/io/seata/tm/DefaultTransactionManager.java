@@ -44,19 +44,39 @@ import io.seata.core.rpc.netty.TmRpcClient;
  */
 public class DefaultTransactionManager implements TransactionManager {
 
+    /**
+     *
+     * 和远程服务器交互   开启一个事物
+     *
+     * @param applicationId           ID of the application who begins this transaction.
+     * @param transactionServiceGroup ID of the transaction service group.
+     * @param name                    Give a name to the global transaction.
+     * @param timeout                 Timeout of the global transaction.
+     * @return
+     * @throws TransactionException
+     */
     @Override
     public String begin(String applicationId, String transactionServiceGroup, String name, int timeout)
         throws TransactionException {
         GlobalBeginRequest request = new GlobalBeginRequest();
         request.setTransactionName(name);
         request.setTimeout(timeout);
+        // 发送消息到TC  开启事物
         GlobalBeginResponse response = (GlobalBeginResponse)syncCall(request);
         if (response.getResultCode() == ResultCode.Failed) {
             throw new TmTransactionException(TransactionExceptionCode.BeginFailed, response.getMsg());
         }
+        // 返回分配的事务id
         return response.getXid();
     }
 
+    /**
+     * 和远程服务器交互 发送事务提交命令， 只能有发起者执行这个方法， 事务参与者不能提交
+     *
+     * @param xid XID of the global transaction.
+     * @return
+     * @throws TransactionException
+     */
     @Override
     public GlobalStatus commit(String xid) throws TransactionException {
         GlobalCommitRequest globalCommit = new GlobalCommitRequest();
@@ -65,6 +85,13 @@ public class DefaultTransactionManager implements TransactionManager {
         return response.getGlobalStatus();
     }
 
+    /**
+     * 和远程服务器交互，发送回滚命令
+     *
+     * @param xid XID of the global transaction
+     * @return
+     * @throws TransactionException
+     */
     @Override
     public GlobalStatus rollback(String xid) throws TransactionException {
         GlobalRollbackRequest globalRollback = new GlobalRollbackRequest();
@@ -73,6 +100,13 @@ public class DefaultTransactionManager implements TransactionManager {
         return response.getGlobalStatus();
     }
 
+    /**
+     * 和远程服务器交互， 获取状态
+     *
+     * @param xid XID of the global transaction.
+     * @return
+     * @throws TransactionException
+     */
     @Override
     public GlobalStatus getStatus(String xid) throws TransactionException {
         GlobalStatusRequest queryGlobalStatus = new GlobalStatusRequest();
@@ -81,6 +115,14 @@ public class DefaultTransactionManager implements TransactionManager {
         return response.getGlobalStatus();
     }
 
+    /**
+     * 打印报表
+     *
+     * @param xid XID of the global transaction.
+     * @param globalStatus Status of the global transaction.
+     * @return
+     * @throws TransactionException
+     */
     @Override
     public GlobalStatus globalReport(String xid, GlobalStatus globalStatus) throws TransactionException {
         GlobalReportRequest globalReport = new GlobalReportRequest();

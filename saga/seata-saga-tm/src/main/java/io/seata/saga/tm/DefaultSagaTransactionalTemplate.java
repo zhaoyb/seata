@@ -15,8 +15,6 @@
  */
 package io.seata.saga.tm;
 
-import java.util.List;
-
 import io.seata.core.exception.TransactionException;
 import io.seata.core.model.BranchStatus;
 import io.seata.core.model.BranchType;
@@ -35,6 +33,7 @@ import io.seata.tm.api.TransactionalExecutor.ExecutionException;
 import io.seata.tm.api.transaction.TransactionHook;
 import io.seata.tm.api.transaction.TransactionHookManager;
 import io.seata.tm.api.transaction.TransactionInfo;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.BeansException;
@@ -50,11 +49,18 @@ import org.springframework.context.ConfigurableApplicationContext;
  * @author lorne.cl
  */
 public class DefaultSagaTransactionalTemplate
-    implements SagaTransactionalTemplate, ApplicationContextAware, DisposableBean, InitializingBean {
+        implements SagaTransactionalTemplate, ApplicationContextAware, DisposableBean, InitializingBean {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(DefaultSagaTransactionalTemplate.class);
 
+    /**
+     * 应用Id
+     */
     private String applicationId;
+
+    /**
+     * 服务组
+     */
     private String txServiceGroup;
     private ApplicationContext applicationContext;
 
@@ -72,7 +78,7 @@ public class DefaultSagaTransactionalTemplate
 
     @Override
     public void rollbackTransaction(GlobalTransaction tx, Throwable ex)
-        throws TransactionException, TransactionalExecutor.ExecutionException {
+            throws TransactionException, TransactionalExecutor.ExecutionException {
         triggerBeforeRollback();
         tx.rollback();
         triggerAfterRollback();
@@ -100,7 +106,7 @@ public class DefaultSagaTransactionalTemplate
 
     @Override
     public void reportTransaction(GlobalTransaction tx, GlobalStatus globalStatus)
-        throws TransactionalExecutor.ExecutionException {
+            throws TransactionalExecutor.ExecutionException {
         try {
             tx.globalReport(globalStatus);
             triggerAfterCompletion();
@@ -112,14 +118,14 @@ public class DefaultSagaTransactionalTemplate
 
     @Override
     public long branchRegister(String resourceId, String clientId, String xid, String applicationData, String lockKeys)
-        throws TransactionException {
+            throws TransactionException {
         return DefaultResourceManager.get().branchRegister(BranchType.SAGA, resourceId, clientId, xid, applicationData,
-            lockKeys);
+                                                           lockKeys);
     }
 
     @Override
     public void branchReport(String xid, long branchId, BranchStatus status, String applicationData)
-        throws TransactionException {
+            throws TransactionException {
         DefaultResourceManager.get().branchReport(BranchType.SAGA, xid, branchId, status, applicationData);
     }
 
@@ -194,6 +200,9 @@ public class DefaultSagaTransactionalTemplate
         }
     }
 
+    /**
+     * 初始化seata客户端
+     */
     @Override
     public void afterPropertiesSet() throws Exception {
         initSeataClient();
@@ -209,23 +218,23 @@ public class DefaultSagaTransactionalTemplate
             LOGGER.info("Initializing Global Transaction Clients ... ");
         }
         if (io.seata.common.util.StringUtils.isNullOrEmpty(applicationId) || io.seata.common.util.StringUtils
-            .isNullOrEmpty(txServiceGroup)) {
+                .isNullOrEmpty(txServiceGroup)) {
             throw new IllegalArgumentException(
-                "applicationId: " + applicationId + ", txServiceGroup: " + txServiceGroup);
+                    "applicationId: " + applicationId + ", txServiceGroup: " + txServiceGroup);
         }
         //init TM
         TMClient.init(applicationId, txServiceGroup);
         if (LOGGER.isInfoEnabled()) {
             LOGGER.info(
-                "Transaction Manager Client is initialized. applicationId[" + applicationId + "] txServiceGroup["
-                    + txServiceGroup + "]");
+                    "Transaction Manager Client is initialized. applicationId[" + applicationId + "] txServiceGroup["
+                            + txServiceGroup + "]");
         }
         //init RM
         RMClient.init(applicationId, txServiceGroup);
         if (LOGGER.isInfoEnabled()) {
             LOGGER.info(
-                "Resource Manager is initialized. applicationId[" + applicationId + "] txServiceGroup[" + txServiceGroup
-                    + "]");
+                    "Resource Manager is initialized. applicationId[" + applicationId + "] txServiceGroup[" + txServiceGroup
+                            + "]");
         }
 
         // Only register application as a saga resource
@@ -243,7 +252,7 @@ public class DefaultSagaTransactionalTemplate
 
     private void registerSpringShutdownHook() {
         if (applicationContext instanceof ConfigurableApplicationContext) {
-            ((ConfigurableApplicationContext)applicationContext).registerShutdownHook();
+            ((ConfigurableApplicationContext) applicationContext).registerShutdownHook();
             ShutdownHook.removeRuntimeShutdownHook();
         }
         ShutdownHook.getInstance().addDisposable(TmRpcClient.getInstance(applicationId, txServiceGroup));

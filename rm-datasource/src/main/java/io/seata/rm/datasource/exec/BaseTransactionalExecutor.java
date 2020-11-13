@@ -83,11 +83,13 @@ public abstract class BaseTransactionalExecutor<T, S extends Statement> implemen
 
     @Override
     public T execute(Object... args) throws Throwable {
+        // 如果处在一个全局事务下，绑定xid
         if (RootContext.inGlobalTransaction()) {
             String xid = RootContext.getXID();
             statementProxy.getConnectionProxy().bind(xid);
         }
 
+        // 设置全局锁要求
         statementProxy.getConnectionProxy().setGlobalLockRequire(RootContext.requireGlobalLock());
         return doExecute(args);
     }
@@ -166,6 +168,8 @@ public abstract class BaseTransactionalExecutor<T, S extends Statement> implemen
     }
 
     /**
+     * 获取表结构
+     *
      * Gets table meta.
      *
      * @return the table meta
@@ -191,6 +195,8 @@ public abstract class BaseTransactionalExecutor<T, S extends Statement> implemen
     }
 
     /**
+     * 列是否是主键
+     *
      * the columns contains table meta pk
      * @param columns the column name list
      * @return true: contains pk false: not contains pk

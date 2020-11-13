@@ -137,6 +137,7 @@ public class DefaultCore implements Core {
 
     @Override
     public GlobalStatus commit(String xid) throws TransactionException {
+        // 根据xid 超找全局事务
         GlobalSession globalSession = SessionHolder.findGlobalSession(xid);
         if (globalSession == null) {
             return GlobalStatus.Finished;
@@ -144,6 +145,7 @@ public class DefaultCore implements Core {
         globalSession.addSessionLifecycleListener(SessionHolder.getRootSessionManager());
         // just lock changeStatus
 
+        // 锁定全局事务，并关闭，避免更多的分支事务注册
         boolean shouldCommit = globalSession.lockAndExecute(() -> {
             // the lock should release after branch commit
             // Highlight: Firstly, close the session, then no more branch can be registered.
@@ -166,6 +168,15 @@ public class DefaultCore implements Core {
         return globalSession.getStatus();
     }
 
+    /**
+     *
+     * 全局提交
+     *
+     * @param globalSession the global session
+     * @param retrying      the retrying
+     * @return
+     * @throws TransactionException
+     */
     @Override
     public boolean doGlobalCommit(GlobalSession globalSession, boolean retrying) throws TransactionException {
         boolean success = true;
@@ -176,6 +187,7 @@ public class DefaultCore implements Core {
         if (globalSession.isSaga()) {
             success = getCore(BranchType.SAGA).doGlobalCommit(globalSession, retrying);
         } else {
+            // 循环所有的分支事务
             for (BranchSession branchSession : globalSession.getSortedBranches()) {
                 BranchStatus currentStatus = branchSession.getStatus();
                 if (currentStatus == BranchStatus.PhaseOne_Failed) {
@@ -183,6 +195,7 @@ public class DefaultCore implements Core {
                     continue;
                 }
                 try {
+                    // 分支提事务交
                     BranchStatus branchStatus = getCore(branchSession.getBranchType()).branchCommit(globalSession, branchSession);
 
                     switch (branchStatus) {

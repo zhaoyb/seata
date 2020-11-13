@@ -77,6 +77,15 @@ public class MysqlTableMetaCache extends AbstractTableMetaCache {
         return cacheKey.toString();
     }
 
+    /**
+     *
+     * 获取表元数据
+     *
+     * @param connection
+     * @param tableName
+     * @return
+     * @throws SQLException
+     */
     @Override
     protected TableMeta fetchSchema(Connection connection, String tableName) throws SQLException {
         String sql = "SELECT * FROM " + keywordChecker.checkAndReplace(tableName) + " LIMIT 1";

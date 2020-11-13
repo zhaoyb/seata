@@ -37,16 +37,35 @@ public class DefaultGlobalTransaction implements GlobalTransaction {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(DefaultGlobalTransaction.class);
 
+    /**
+     *
+     * 事务默认超时时间
+     *
+     */
     private static final int DEFAULT_GLOBAL_TX_TIMEOUT = 60000;
 
+    /**
+     *
+     * 事务默认名称
+     *
+     */
     private static final String DEFAULT_GLOBAL_TX_NAME = "default";
 
     private TransactionManager transactionManager;
 
+    /**
+     * 事务Id
+     *
+     */
     private String xid;
 
     private GlobalStatus status;
 
+    /**
+     *
+     * 事务角色，  发起者 or 参与者
+     *
+     */
     private GlobalTransactionRole role;
 
     private static final int COMMIT_RETRY_COUNT = ConfigurationFactory.getInstance().getInt(
@@ -88,18 +107,24 @@ public class DefaultGlobalTransaction implements GlobalTransaction {
 
     @Override
     public void begin(int timeout, String name) throws TransactionException {
+        // 判断事务角色， 是否是发起者
         if (role != GlobalTransactionRole.Launcher) {
+            // 判断xid是否为空， 如果为空， 抛出异常
             assertXIDNotNull();
             if (LOGGER.isDebugEnabled()) {
                 LOGGER.debug("Ignore Begin(): just involved in global transaction [{}]", xid);
             }
             return;
         }
+        // 判断xid是否为空， 如果不为空， 抛出异常
         assertXIDNull();
+        // 如果当前上下文中xid不为空， 则抛出异常
         if (RootContext.getXID() != null) {
             throw new IllegalStateException();
         }
+        // 发送消息都TC， 返回xid
         xid = transactionManager.begin(null, null, name, timeout);
+        // 事务状态改为开始
         status = GlobalStatus.Begin;
         RootContext.bind(xid);
         if (LOGGER.isInfoEnabled()) {
@@ -110,7 +135,9 @@ public class DefaultGlobalTransaction implements GlobalTransaction {
 
     @Override
     public void commit() throws TransactionException {
+        // 如果当前角色是参与者
         if (role == GlobalTransactionRole.Participant) {
+            // 参与者不提交事务
             // Participant has no responsibility of committing
             if (LOGGER.isDebugEnabled()) {
                 LOGGER.debug("Ignore Commit(): just involved in global transaction [{}]", xid);
@@ -118,6 +145,7 @@ public class DefaultGlobalTransaction implements GlobalTransaction {
             return;
         }
         assertXIDNotNull();
+        // 重试次数
         int retry = COMMIT_RETRY_COUNT;
         try {
             while (retry > 0) {
@@ -134,6 +162,7 @@ public class DefaultGlobalTransaction implements GlobalTransaction {
             }
         } finally {
             if (RootContext.getXID() != null && xid.equals(RootContext.getXID())) {
+                // 解绑 清除
                 RootContext.unbind();
             }
         }
@@ -145,6 +174,7 @@ public class DefaultGlobalTransaction implements GlobalTransaction {
 
     @Override
     public void rollback() throws TransactionException {
+        // 事务参与者 不能发起回滚命令
         if (role == GlobalTransactionRole.Participant) {
             // Participant has no responsibility of rollback
             if (LOGGER.isDebugEnabled()) {
@@ -154,6 +184,7 @@ public class DefaultGlobalTransaction implements GlobalTransaction {
         }
         assertXIDNotNull();
 
+        // 回滚重试
         int retry = ROLLBACK_RETRY_COUNT;
         try {
             while (retry > 0) {

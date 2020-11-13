@@ -64,20 +64,24 @@ public class ExecuteTemplate {
                                                      StatementCallback<T, S> statementCallback,
                                                      Object... args) throws SQLException {
 
+        // 如果不再一个全局事务中(没有TX_XID) 并且没有全局所标志 则不用seata直接执行。
         if (!RootContext.inGlobalTransaction() && !RootContext.requireGlobalLock()) {
             // Just work as original statement
             return statementCallback.execute(statementProxy.getTargetStatement(), args);
         }
 
+        //SQL识别
         if (sqlRecognizer == null) {
             sqlRecognizer = SQLVisitorFactory.get(
                     statementProxy.getTargetSQL(),
                     statementProxy.getConnectionProxy().getDbType());
         }
         Executor<T> executor;
+        // 如果SQL识别结果为空， 则不用seata直接执行，
         if (sqlRecognizer == null) {
             executor = new PlainExecutor<>(statementProxy, statementCallback);
         } else {
+            // SQL类型， 不同的SQL类型， 使用不同的SQL执行器，这里之所以有不同的执行器，主要是执行前后的生成undolog的方式不同
             switch (sqlRecognizer.getSQLType()) {
                 case INSERT:
                     executor = new InsertExecutor<>(statementProxy, statementCallback, sqlRecognizer);
@@ -88,16 +92,21 @@ public class ExecuteTemplate {
                 case DELETE:
                     executor = new DeleteExecutor<>(statementProxy, statementCallback, sqlRecognizer);
                     break;
+                    //这里这里，为了避免seata事务下的脏读，可以使用select for update
                 case SELECT_FOR_UPDATE:
                     executor = new SelectForUpdateExecutor<>(statementProxy, statementCallback, sqlRecognizer);
                     break;
                 default:
+                    // 不属于上面几个类型，则不用seata直接执行， 这里注意，没有对普通的select进行代理， 会造成所谓的脏读现象，
+                    // 注意这里的脏读，是seata事务下的脏读，而不是数据库本身的脏读。如果想要读提交，则需要select for update
+                    //
                     executor = new PlainExecutor<>(statementProxy, statementCallback);
                     break;
             }
         }
         T rs;
         try {
+            // 执行器执行
             rs = executor.execute(args);
         } catch (Throwable ex) {
             if (!(ex instanceof SQLException)) {

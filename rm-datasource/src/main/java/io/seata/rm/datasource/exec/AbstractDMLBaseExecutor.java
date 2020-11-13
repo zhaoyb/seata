@@ -53,7 +53,9 @@ public abstract class AbstractDMLBaseExecutor<T, S extends Statement> extends Ba
 
     @Override
     public T doExecute(Object... args) throws Throwable {
+        // 获取连接代理
         AbstractConnectionProxy connectionProxy = statementProxy.getConnectionProxy();
+        // 判断是否自动提交，其实下面实现方式一样， 所谓AutoCommittrue就是先把commit标志设置为false
         if (connectionProxy.getAutoCommit()) {
             return executeAutoCommitTrue(args);
         } else {
@@ -69,9 +71,13 @@ public abstract class AbstractDMLBaseExecutor<T, S extends Statement> extends Ba
      * @throws Exception the exception
      */
     protected T executeAutoCommitFalse(Object[] args) throws Exception {
+        // 获取SQL执行前数据
         TableRecords beforeImage = beforeImage();
+        // 执行sql
         T result = statementCallback.execute(statementProxy.getTargetStatement(), args);
+        // 获取SQL执行后的数据
         TableRecords afterImage = afterImage(beforeImage);
+        // undolog
         prepareUndoLog(beforeImage, afterImage);
         return result;
     }
@@ -86,9 +92,13 @@ public abstract class AbstractDMLBaseExecutor<T, S extends Statement> extends Ba
     protected T executeAutoCommitTrue(Object[] args) throws Throwable {
         ConnectionProxy connectionProxy = statementProxy.getConnectionProxy();
         try {
+            // 把autocommit手动设置false
             connectionProxy.setAutoCommit(false);
+            // 下面的方法在遇到全局锁的时候，会重试
             return new LockRetryPolicy(connectionProxy).execute(() -> {
+                // 这里仅仅是执行sql 生成undolog ，并不会报锁冲突
                 T result = executeAutoCommitFalse(args);
+                // 在提交前，要拿到全局锁，如果没有，则要重试
                 connectionProxy.commit();
                 return result;
             });

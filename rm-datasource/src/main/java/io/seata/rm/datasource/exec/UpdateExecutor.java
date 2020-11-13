@@ -55,19 +55,30 @@ public class UpdateExecutor<T, S extends Statement> extends AbstractDMLBaseExecu
         super(statementProxy, statementCallback, sqlRecognizer);
     }
 
+    /**
+     * 获取更新前 数据
+     *
+     * @return
+     * @throws SQLException
+     */
     @Override
     protected TableRecords beforeImage() throws SQLException {
 
         ArrayList<List<Object>> paramAppenderList = new ArrayList<>();
+        // 获取表结构
         TableMeta tmeta = getTableMeta();
+        // 将update 语句，改为select xx from table where yy  for update
         String selectSQL = buildBeforeImageSQL(tmeta, paramAppenderList);
+        // 查找记录
         return buildTableRecords(tmeta, selectSQL, paramAppenderList);
     }
 
     private String buildBeforeImageSQL(TableMeta tableMeta, ArrayList<List<Object>> paramAppenderList) {
         SQLUpdateRecognizer recognizer = (SQLUpdateRecognizer)sqlRecognizer;
+        // 获取要更新的列
         List<String> updateColumns = recognizer.getUpdateColumns();
         StringBuilder prefix = new StringBuilder("SELECT ");
+        // 判断列是否是主键
         if (!containsPK(updateColumns)) {
             prefix.append(getColumnNameInSQL(tableMeta.getEscapePkName(getDbType()))).append(", ");
         }
@@ -84,6 +95,13 @@ public class UpdateExecutor<T, S extends Statement> extends AbstractDMLBaseExecu
         return selectSQLJoin.toString();
     }
 
+    /**
+     * 获取跟新后数据
+     *
+     * @param beforeImage the before image
+     * @return
+     * @throws SQLException
+     */
     @Override
     protected TableRecords afterImage(TableRecords beforeImage) throws SQLException {
         TableMeta tmeta = getTableMeta();

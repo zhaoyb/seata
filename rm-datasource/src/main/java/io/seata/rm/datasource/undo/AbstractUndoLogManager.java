@@ -241,7 +241,7 @@ public abstract class AbstractUndoLogManager implements UndoLogManager {
                     conn.setAutoCommit(false);
                 }
 
-                // Find UNDO LOG
+                // Find UNDO LOG  找到之前的undolog
                 selectPST = conn.prepareStatement(SELECT_UNDO_LOG_SQL);
                 selectPST.setLong(1, branchId);
                 selectPST.setString(2, xid);
@@ -254,6 +254,7 @@ public abstract class AbstractUndoLogManager implements UndoLogManager {
                     // It is possible that the server repeatedly sends a rollback request to roll back
                     // the same branch transaction to multiple processes,
                     // ensuring that only the undo_log in the normal state is processed.
+                    // 防止并发 仅处理Normal状态的undolog
                     int state = rs.getInt(ClientTableColumnsName.UNDO_LOG_LOG_STATUS);
                     if (!canUndo(state)) {
                         if (LOGGER.isInfoEnabled()) {
@@ -262,22 +263,31 @@ public abstract class AbstractUndoLogManager implements UndoLogManager {
                         return;
                     }
 
+                    // 回滚上下文信息
                     String contextString = rs.getString(ClientTableColumnsName.UNDO_LOG_CONTEXT);
+                    //转为map
                     Map<String, String> context = parseContext(contextString);
+                    // 二进制回滚信息
                     byte[] rollbackInfo = getRollbackInfo(rs);
 
+                    // 从上下文信息中取出序列化标示
                     String serializer = context == null ? null : context.get(UndoLogConstants.SERIALIZER_KEY);
+                    // 根据序列化标示， 返回不同观点序列化实例
                     UndoLogParser parser = serializer == null ? UndoLogParserFactory.getInstance()
                         : UndoLogParserFactory.getInstance(serializer);
+
+                    // 回滚信息反序列化 解码
                     BranchUndoLog branchUndoLog = parser.decode(rollbackInfo);
 
                     try {
                         // put serializer name to local
                         setCurrentSerializer(parser.getName());
+                        //所有undolog 记录
                         List<SQLUndoLog> sqlUndoLogs = branchUndoLog.getSqlUndoLogs();
                         if (sqlUndoLogs.size() > 1) {
                             Collections.reverse(sqlUndoLogs);
                         }
+                        // 反向生成undolog sql,
                         for (SQLUndoLog sqlUndoLog : sqlUndoLogs) {
                             TableMeta tableMeta = TableMetaCacheFactory.getTableMetaCache(dataSourceProxy.getDbType()).getTableMeta(
                                 conn, sqlUndoLog.getTableName(), dataSourceProxy.getResourceId());
@@ -301,6 +311,7 @@ public abstract class AbstractUndoLogManager implements UndoLogManager {
                 // to prevent the local transaction of the first phase of other programs from being correctly submitted.
                 // See https://github.com/seata/seata/issues/489
 
+                // 执行回滚后，删除undolog
                 if (exists) {
                     deleteUndoLog(xid, branchId, conn);
                     conn.commit();

@@ -188,11 +188,14 @@ public class ConnectionProxy extends AbstractConnectionProxy {
     }
 
     private void doCommit() throws SQLException {
+        // 分值事务
         if (context.inGlobalTransaction()) {
             processGlobalTransactionCommit();
         } else if (context.isGlobalLockRequire()) {
+            // globallock处理
             processLocalCommitWithGlobalLocks();
         } else {
+            // 直接提交
             targetConnection.commit();
         }
     }
@@ -210,15 +213,20 @@ public class ConnectionProxy extends AbstractConnectionProxy {
 
     private void processGlobalTransactionCommit() throws SQLException {
         try {
+            // 注册分支事务，buildLockKeys   key是要修改数据行的主键
             register();
         } catch (TransactionException e) {
+            // 抛出 锁冲突错误，外面的方法 会一直重试
             recognizeLockKeyConflictException(e, context.buildLockKeys());
         }
 
+        //---------------------获取全局锁成功
         try {
             if (context.hasUndoLog()) {
+                // 如果有undolog， 则插入unlog
                 UndoLogManagerFactory.getUndoLogManager(this.getDbType()).flushUndoLogs(this);
             }
+            // 整个本地事务提交
             targetConnection.commit();
         } catch (Throwable ex) {
             LOGGER.error("process connectionProxy commit error: {}", ex.getMessage(), ex);
@@ -275,24 +283,31 @@ public class ConnectionProxy extends AbstractConnectionProxy {
     }
 
     public static class LockRetryPolicy {
+        // 锁冲突时，是否重试
         protected static final boolean LOCK_RETRY_POLICY_BRANCH_ROLLBACK_ON_CONFLICT = ConfigurationFactory
             .getInstance().getBoolean(ConfigurationKeys.CLIENT_LOCK_RETRY_POLICY_BRANCH_ROLLBACK_ON_CONFLICT, DEFAULT_CLIENT_LOCK_RETRY_POLICY_BRANCH_ROLLBACK_ON_CONFLICT);
 
         public <T> T execute(Callable<T> callable) throws Exception {
             if (LOCK_RETRY_POLICY_BRANCH_ROLLBACK_ON_CONFLICT) {
+                // 不重试
                 return callable.call();
             } else {
+                // 重试
                 return doRetryOnLockConflict(callable);
             }
         }
 
         protected <T> T doRetryOnLockConflict(Callable<T> callable) throws Exception {
             LockRetryController lockRetryController = new LockRetryController();
+            // 注意这里是在一个while死循环中
             while (true) {
                 try {
+                    // 调用
                     return callable.call();
                 } catch (LockConflictException lockConflict) {
+                    // 遇到锁冲突，就是别的事务抢先拿到了要修改行的全局锁
                     onException(lockConflict);
+                    // sleep一段时间
                     lockRetryController.sleep(lockConflict);
                 } catch (Exception e) {
                     onException(e);

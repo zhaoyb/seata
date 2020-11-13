@@ -20,6 +20,9 @@ import io.seata.core.exception.TransactionException;
 import io.seata.core.model.GlobalStatus;
 
 /**
+ *
+ * 事务API
+ *
  * GlobalTransaction API
  *
  * @author sharajava
@@ -30,6 +33,9 @@ public class GlobalTransactionContext {
     }
 
     /**
+     *
+     * 创建一个新的全局事务
+     *
      * Try to create a new GlobalTransaction.
      *
      * @return
@@ -39,6 +45,8 @@ public class GlobalTransactionContext {
     }
 
     /**
+     * 从当前线程获取全局事务， 要么存在， 要么为null
+     *
      * Get GlobalTransaction instance bind on current thread.
      *
      * @return null if no transaction context there.
@@ -52,6 +60,8 @@ public class GlobalTransactionContext {
     }
 
     /**
+     * 获取或者新建
+     *
      * Get GlobalTransaction instance bind on current thread. Create a new on if no existing there.
      *
      * @return new context if no existing there.
@@ -65,6 +75,8 @@ public class GlobalTransactionContext {
     }
 
     /**
+     * 刷新实例
+     *
      * Reload GlobalTransaction instance according to the given XID
      *
      * @param xid the xid
