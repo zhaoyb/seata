@@ -89,6 +89,20 @@ public class DefaultCore implements Core {
         coreMap.put(branchType, core);
     }
 
+
+    /**
+     *
+     * 分支事务注册， 获取全局锁
+     *
+     * @param branchType the branch type
+     * @param resourceId the resource id
+     * @param clientId   the client id
+     * @param xid        the xid
+     * @param applicationData the context
+     * @param lockKeys   the lock keys
+     * @return
+     * @throws TransactionException
+     */
     @Override
     public Long branchRegister(BranchType branchType, String resourceId, String clientId, String xid,
                                String applicationData, String lockKeys) throws TransactionException {

@@ -50,7 +50,7 @@ public abstract class AbstractLockManager implements LockManager {
             //no lock
             return true;
         }
-        //get locks of branch
+        //get locks of branch 获取要锁定的行
         List<RowLock> locks = collectRowLocks(branchSession);
         if (CollectionUtils.isEmpty(locks)) {
             //no lock
@@ -166,10 +166,12 @@ public abstract class AbstractLockManager implements LockManager {
             if (StringUtils.isBlank(mergedPKs)) {
                 return locks;
             }
+            // 主键
             String[] pks = mergedPKs.split(",");
             if (pks == null || pks.length == 0) {
                 return locks;
             }
+            // 遍历每一个主键
             for (String pk : pks) {
                 if (StringUtils.isNotBlank(pk)) {
                     RowLock rowLock = new RowLock();

@@ -41,6 +41,13 @@ public class ATCore extends AbstractCore {
         return BranchType.AT;
     }
 
+    /**
+     * 分支事务 注册锁
+     *
+     * @param globalSession
+     * @param branchSession
+     * @throws TransactionException
+     */
     @Override
     protected void branchSessionLock(GlobalSession globalSession, BranchSession branchSession) throws TransactionException {
         if (!branchSession.lock()) {

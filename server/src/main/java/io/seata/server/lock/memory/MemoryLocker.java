@@ -58,6 +58,13 @@ public class MemoryLocker extends AbstractLocker {
         this.branchSession = branchSession;
     }
 
+    /**
+     *
+     * 全局锁
+     *
+     * @param rowLocks
+     * @return
+     */
     @Override
     public boolean acquireLock(List<RowLock> rowLocks) {
         if (CollectionUtils.isEmpty(rowLocks)) {
